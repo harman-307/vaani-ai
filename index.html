@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="hi" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>वाणी AI (Vaani AI) - हिंदी वॉयस चैटबॉट</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & Noto Sans Devanagari -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans Devanagari', 'sans-serif'],
+                        hindi: ['Noto Sans Devanagari', 'Inter', 'sans-serif']
+                    },
+                    colors: {
+                        saffron: {
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                        },
+                        indigoDeep: {
+                            900: '#0f1026',
+                            950: '#070814'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans Devanagari', sans-serif;
+            background-color: #070814;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        /* Custom subtle Indian Mandala / Geometric radial glow */
+        .bg-royal-glow {
+            background: 
+                radial-gradient(circle at 15% 20%, rgba(249, 115, 22, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 85% 80%, rgba(20, 184, 166, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 60%);
+        }
+
+        /* Animated Pulse Rings for Microphone */
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.8;
+            }
+            70% {
+                transform: scale(1.65);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1.8);
+                opacity: 0;
+            }
+        }
+
+        .mic-listening-ring::before,
+        .mic-listening-ring::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 9999px;
+            border: 2px solid #f97316;
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+            pointer-events: none;
+        }
+
+        .mic-listening-ring::after {
+            animation-delay: 0.9s;
+            border-color: #14b8a6;
+        }
+
+        /* Soundbar Visualizer Animation */
+        @keyframes sound-wave {
+            0%, 100% {
+                height: 6px;
+            }
+            50% {
+                height: 28px;
+            }
+        }
+
+        .wave-bar {
+            width: 4px;
+            height: 6px;
+            border-radius: 999px;
+            transition: height 0.15s ease;
+        }
+
+        .speaking-active .wave-bar {
+            animation: sound-wave 0.7s ease-in-out infinite;
+        }
+        .speaking-active .wave-bar:nth-child(1) { animation-delay: 0.0s; }
+        .speaking-active .wave-bar:nth-child(2) { animation-delay: 0.15s; }
+        .speaking-active .wave-bar:nth-child(3) { animation-delay: 0.3s; }
+        .speaking-active .wave-bar:nth-child(4) { animation-delay: 0.1s; }
+        .speaking-active .wave-bar:nth-child(5) { animation-delay: 0.25s; }
+        .speaking-active .wave-bar:nth-child(6) { animation-delay: 0.4s; }
+        .speaking-active .wave-bar:nth-child(7) { animation-delay: 0.12s; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.4);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.25);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(249, 115, 22, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-indigoDeep-950 bg-royal-glow min-h-screen flex flex-col justify-between selection:bg-orange-500 selection:text-white">
+
+    <!-- Top Navigation & Status Header -->
+    <header class="sticky top-0 z-30 backdrop-blur-xl bg-slate-950/75 border-b border-slate-800/80 px-4 py-3">
+        <div class="max-w-4xl mx-auto flex items-center justify-between gap-2">
+            <!-- Brand & Avatar -->
+            <div class="flex items-center gap-3">
+                <div id="aiAvatarContainer" class="relative w-11 h-11 rounded-2xl bg-gradient-to-tr from-orange-600 via-amber-500 to-teal-400 p-[2px] shadow-lg shadow-orange-500/20 transition-transform duration-300">
+                    <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center relative overflow-hidden">
+                        <i id="avatarIcon" class="ph-fill ph-sparkle text-xl text-amber-400"></i>
+                        <!-- Visualizer bars inside avatar when speaking -->
+                        <div id="avatarVisualizer" class="hidden items-center gap-[3px] px-1">
+                            <div class="wave-bar bg-orange-400"></div>
+                            <div class="wave-bar bg-amber-300"></div>
+                            <div class="wave-bar bg-teal-400"></div>
+                            <div class="wave-bar bg-orange-400"></div>
+                            <div class="wave-bar bg-amber-300"></div>
+                        </div>
+                    </div>
+                    <!-- Online Dot -->
+                    <span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-slate-950 rounded-full"></span>
+                </div>
+
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-orange-400 via-amber-200 to-teal-300 bg-clip-text text-transparent">
+                            वाणी AI <span class="text-xs font-medium text-slate-400 hidden sm:inline">(Vaani AI)</span>
+                        </h1>
+                        <span class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-500/30">
+                            हिंदी वॉयस असिस्टेंट
+                        </span>
+                    </div>
+                    <!-- Dynamic Status Indicator -->
+                    <div class="flex items-center gap-2 mt-0.5">
+                        <span id="statusDot" class="w-2 h-2 rounded-full bg-teal-400"></span>
+                        <p id="statusText" class="text-xs text-slate-300 font-medium">
+                            तैयार है • बोलने के लिए माइक दबाएं (Ready)
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Controls -->
+            <div class="flex items-center gap-1.5 sm:gap-2">
+                <!-- Speech Input Language Toggle (hi-IN vs en-IN) -->
+                <button id="langToggleBtn" onclick="toggleRecognitionLang()" title="बोलने की भाषा बदलें (Switch Mic Language)" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-xs font-medium text-slate-200 transition">
+                    <i class="ph ph-translate text-orange-400 text-base"></i>
+                    <span id="currentLangLabel">माइक: हिंदी (hi-IN)</span>
+                </button>
+
+                <!-- Auto-Speak Mute/Unmute Toggle -->
+                <button id="muteToggleBtn" onclick="toggleAutoSpeak()" title="आवाज़ चालू/बंद करें (Mute/Unmute AI Voice)" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-teal-400 transition">
+                    <i id="muteIcon" class="ph-fill ph-speaker-high text-lg"></i>
+                </button>
+
+                <!-- Voice Settings Drawer Button -->
+                <button onclick="toggleSettingsModal()" title="आवाज़ सेटिंग्स (Voice Settings)" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white transition">
+                    <i class="ph ph-sliders-horizontal text-lg"></i>
+                </button>
+
+                <!-- Clear Chat Button -->
+                <button onclick="clearConversation()" title="चैट साफ़ करें (Clear Conversation)" class="p-2 rounded-xl bg-slate-900 hover:bg-red-950/60 border border-slate-700/80 hover:border-red-500/40 text-slate-400 hover:text-red-400 transition">
+                    <i class="ph ph-trash text-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Collapsible Voice Settings Panel -->
+        <div id="settingsPanel" class="hidden max-w-4xl mx-auto mt-3 pt-3 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs bg-slate-900/60 p-3.5 rounded-2xl">
+            <!-- Voice Engine & Selection -->
+            <div class="flex flex-col gap-1.5">
+                <label class="text-slate-400 font-medium flex items-center justify-between">
+                    <span>आवाज़ का माध्यम (Voice Engine):</span>
+                    <span id="voiceEngineBadge" class="text-[10px] text-teal-400">Auto</span>
+                </label>
+                <select id="voiceSelect" onchange="handleVoiceChange()" class="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-slate-200 focus:outline-none focus:border-orange-500">
+                    <option value="gemini-neural">✨ Gemini Neural Hindi Voice (असली जैसी आवाज़)</option>
+                </select>
+            </div>
+
+            <!-- Speaking Speed (Rate) -->
+            <div class="flex flex-col gap-1.5">
+                <div class="flex justify-between text-slate-400 font-medium">
+                    <span>बोलने की गति (Speed):</span>
+                    <span id="rateValueLabel" class="text-orange-400 font-semibold">1.0x</span>
+                </div>
+                <input id="rateSlider" type="range" min="0.6" max="1.5" step="0.1" value="1.0" oninput="updateVoiceParams()" class="accent-orange-500 cursor-pointer mt-1">
+                <div class="flex justify-between text-[10px] text-slate-500">
+                    <span>धीमा (0.6x)</span>
+                    <span>सामान्य (1.0x)</span>
+                    <span>तेज़ (1.5x)</span>
+                </div>
+            </div>
+
+            <!-- Voice Pitch -->
+            <div class="flex flex-col gap-1.5">
+                <div class="flex justify-between text-slate-400 font-medium">
+                    <span>आवाज़ की पिच (Pitch):</span>
+                    <span id="pitchValueLabel" class="text-teal-400 font-semibold">1.0</span>
+                </div>
+                <input id="pitchSlider" type="range" min="0.6" max="1.4" step="0.1" value="1.0" oninput="updateVoiceParams()" class="accent-teal-400 cursor-pointer mt-1">
+                <div class="flex justify-between text-[10px] text-slate-500">
+                    <span>गहरी (0.6)</span>
+                    <span>सामान्य (1.0)</span>
+                    <span>तीखी (1.4)</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Conversation Area -->
+    <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-4 flex flex-col justify-between overflow-hidden">
+        
+        <!-- Active AI Speaking / Listening Visualizer Banner -->
+        <div id="liveStateBanner" class="hidden mb-3 py-2.5 px-4 rounded-2xl bg-gradient-to-r from-orange-500/10 via-indigo-500/15 to-teal-500/10 border border-orange-500/30 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div id="bannerWave" class="speaking-active flex items-center gap-1 h-6">
+                    <div class="wave-bar bg-orange-400"></div>
+                    <div class="wave-bar bg-amber-400"></div>
+                    <div class="wave-bar bg-teal-400"></div>
+                    <div class="wave-bar bg-orange-500"></div>
+                    <div class="wave-bar bg-amber-300"></div>
+                    <div class="wave-bar bg-teal-300"></div>
+                    <div class="wave-bar bg-orange-400"></div>
+                </div>
+                <span id="bannerStateTitle" class="text-sm font-medium text-amber-200">बोल रहा हूँ... (Speaking...)</span>
+            </div>
+            <button onclick="stopSpeaking()" class="text-xs px-3 py-1 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 flex items-center gap-1 transition">
+                <i class="ph-fill ph-stop"></i> रोकें (Stop)
+            </button>
+        </div>
+
+        <!-- Messages Container -->
+        <div id="chatContainer" class="flex-1 overflow-y-auto space-y-4 pr-1 pb-4 max-h-[calc(100vh-290px)] sm:max-h-[calc(100vh-270px)]">
+            
+            <!-- Welcome Hero Card -->
+            <div id="welcomeCard" class="bg-slate-900/70 border border-slate-800/90 rounded-3xl p-5 sm:p-6 text-center max-w-2xl mx-auto my-2 shadow-xl">
+                <div class="w-16 h-16 rounded-3xl bg-gradient-to-br from-orange-500/20 to-teal-500/20 border border-orange-500/30 flex items-center justify-center mx-auto mb-3 shadow-inner">
+                    <i class="ph-duotone ph-microphone-stage text-3xl text-orange-400"></i>
+                </div>
+                <h2 class="text-xl sm:text-2xl font-bold text-white mb-1">
+                    नमस्ते! मैं <span class="text-orange-400">वाणी AI</span> हूँ 🙏
+                </h2>
+                <p class="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+                    मुझसे शुद्ध हिंदी, हिंग्लिश (Hinglish) या अंग्रेजी में बात करें। आप नीचे दिए गए माइक बटन को दबाकर बोल सकते हैं या टाइप कर सकते हैं।
+                </p>
+
+                <!-- Quick Starter Prompt Chips -->
+                <div class="mt-5">
+                    <p class="text-xs font-medium text-slate-400 mb-2.5 uppercase tracking-wider">तुरंत बातचीत शुरू करें (Quick Prompts):</p>
+                    <div class="flex flex-wrap items-center justify-center gap-2">
+                        <button onclick="sendQuickPrompt('नमस्ते! आप कैसे हैं?')" class="text-xs sm:text-sm px-3.5 py-2 rounded-2xl bg-slate-800/90 hover:bg-orange-500/20 border border-slate-700 hover:border-orange-500/50 text-slate-200 hover:text-orange-200 transition flex items-center gap-1.5">
+                            <span>👋</span> नमस्ते! आप कैसे हैं?
+                        </button>
+                        <button onclick="sendQuickPrompt('मुझे एक मजेदार चुटकुला सुनाओ')" class="text-xs sm:text-sm px-3.5 py-2 rounded-2xl bg-slate-800/90 hover:bg-orange-500/20 border border-slate-700 hover:border-orange-500/50 text-slate-200 hover:text-orange-200 transition flex items-center gap-1.5">
+                            <span>😄</span> मुझे एक मजेदार चुटकुला सुनाओ
+                        </button>
+                        <button onclick="sendQuickPrompt('आज के लिए कोई अच्छी सलाह दो')" class="text-xs sm:text-sm px-3.5 py-2 rounded-2xl bg-slate-800/90 hover:bg-orange-500/20 border border-slate-700 hover:border-orange-500/50 text-slate-200 hover:text-orange-200 transition flex items-center gap-1.5">
+                            <span>💡</span> आज के लिए कोई अच्छी सलाह दो
+                        </button>
+                        <button onclick="sendQuickPrompt('रोबोटिक्स और AI के बारे में आसान हिंदी में बताओ')" class="text-xs sm:text-sm px-3.5 py-2 rounded-2xl bg-slate-800/90 hover:bg-orange-500/20 border border-slate-700 hover:border-orange-500/50 text-slate-200 hover:text-orange-200 transition flex items-center gap-1.5">
+                            <span>🤖</span> रोबोटिक्स और AI के बारे में बताओ
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Initial Greeting Bubble from AI -->
+            <div class="flex items-start gap-3">
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center shrink-0 mt-1 shadow-md">
+                    <i class="ph-fill ph-sparkle text-white text-sm"></i>
+                </div>
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%] sm:max-w-[75%] shadow-md">
+                    <p class="text-sm sm:text-base text-slate-100 leading-relaxed font-hindi">
+                        नमस्ते! मैं आपकी हिंदी AI सहायक हूँ। आप माइक दबाकर मुझसे कुछ भी पूछ सकते हैं। आज मैं आपकी क्या मदद कर सकती हूँ?
+                    </p>
+                    <div class="flex items-center justify-between gap-4 mt-2 pt-1.5 border-t border-slate-800/80 text-[11px] text-slate-400">
+                        <span>वाणी AI • हिंदी</span>
+                        <button onclick="speakText('नमस्ते! मैं आपकी हिंदी एआई सहायक हूँ। आप माइक दबाकर मुझसे कुछ भी पूछ सकते हैं। आज मैं आपकी क्या मदद कर सकती हूँ?')" class="flex items-center gap-1 text-teal-400 hover:text-teal-300 font-medium transition">
+                            <i class="ph-fill ph-play-circle text-sm"></i> सुनें (Replay)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Live Interim Speech Transcript Preview -->
+        <div id="interimTranscriptBox" class="hidden mb-2 px-4 py-2 rounded-2xl bg-orange-500/10 border border-orange-500/30 text-orange-200 text-sm flex items-center gap-2 animate-pulse">
+            <i class="ph-fill ph-microphone text-orange-400"></i>
+            <span id="interimText" class="italic">सुन रहा हूँ... (Listening...)</span>
+        </div>
+
+        <!-- Non-intrusive Toast Notification -->
+        <div id="toastMessage" class="hidden mb-2 px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-amber-300 text-center"></div>
+
+    </main>
+
+    <!-- Bottom Voice & Text Input Dock -->
+    <footer class="sticky bottom-0 z-30 backdrop-blur-xl bg-slate-950/85 border-t border-slate-800/80 px-4 py-3">
+        <div class="max-w-4xl mx-auto flex flex-col gap-2">
+            <div class="flex items-center gap-2.5 sm:gap-3">
+                
+                <!-- Prominent Animated Microphone Button -->
+                <div class="relative flex items-center justify-center">
+                    <button id="micButton" onclick="toggleListening()" aria-label="माइक चालू या बंद करें" class="relative z-10 w-14 h-14 sm:w-15 sm:h-15 rounded-full bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 hover:from-orange-500 hover:to-amber-300 text-white shadow-lg shadow-orange-500/30 flex items-center justify-center transition-all duration-200 active:scale-95 focus:outline-none">
+                        <i id="micIcon" class="ph-fill ph-microphone text-2xl sm:text-3xl"></i>
+                    </button>
+                </div>
+
+                <!-- Text Input Fallback Form -->
+                <form id="chatForm" onsubmit="handleFormSubmit(event)" class="flex-1 flex items-center gap-2 bg-slate-900/95 border border-slate-700/80 focus-within:border-orange-500/70 rounded-2xl px-3.5 py-2 shadow-inner transition">
+                    <input 
+                        id="userInput" 
+                        type="text" 
+                        placeholder="हिंदी या Hinglish में बोलें या यहाँ लिखें..." 
+                        autocomplete="off"
+                        class="w-full bg-transparent text-sm sm:text-base text-slate-100 placeholder-slate-400 focus:outline-none font-hindi"
+                    />
+                    <button type="submit" id="sendButton" class="px-3.5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold text-xs sm:text-sm flex items-center gap-1.5 transition shrink-0 shadow-md shadow-teal-500/20">
+                        <span class="hidden sm:inline">भेजें</span>
+                        <i class="ph-bold ph-paper-plane-right text-base"></i>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Helper Legend -->
+            <div class="flex items-center justify-between text-[11px] text-slate-400 px-1">
+                <span id="micHelperLabel">🎙️ माइक दबाकर हिंदी या हिंग्लिश में बोलें (Tap mic to speak)</span>
+                <span class="hidden sm:inline text-slate-500">Powered by Gemini AI • देवनागरी लिपि</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        /**************************************************************
+         * 1. APPLICATION STATE & CONFIGURATION
+         **************************************************************/
+        const apiKey = ""; // Canvas runtime automatically injects the API key
+        const TEXT_MODEL = "gemini-3-flash-preview";
+        const TTS_MODEL = "gemini-2.5-flash-preview-tts";
+
+        const SYSTEM_INSTRUCTION = `आप "वाणी AI" (Vaani AI) हैं — एक बेहद समझदार, मिलनसार और मददगार हिंदी वॉयस एआई सहायक।
+महत्वपूर्ण नियम:
+1. उपयोगकर्ता (User) शुद्ध हिंदी, बोलचाल की हिंदी, हिंग्लिश (Hinglish - Roman script) या अंग्रेजी में सवाल पूछ सकता है। आपको उन सभी को पूरी तरह समझना है।
+2. अपना जवाब हमेशा सरल, स्वाभाविक और बोलचाल की हिंदी (देवनागरी लिपि / Devanagari script) में दें ताकि जब उसे Text-to-Speech (TTS) द्वारा बोला जाए, तो वह बिल्कुल इंसान जैसा स्पष्ट और मधुर सुनाई दे।
+3. जवाब संक्षिप्त, रोचक और बातचीत के लहजे में रखें (आमतौर पर 2 से 4 वाक्य, जब तक कि उपयोगकर्ता विस्तृत जानकारी न मांगे)।
+4. भारी या जटिल संस्कृतनिष्ठ शब्दों के बजाय आम बोलचाल के हिंदी शब्दों का प्रयोग करें।
+5. टेक्स्ट में अनावश्यक मार्कडाउन चिह्न जैसे *, #, या लंबे बुलेट पॉइंट्स का कम से कम उपयोग करें ताकि वॉयस रीडर उन्हें अजीब तरह से न पढ़े।`;
+
+        let conversationHistory = [];
+        let isListening = false;
+        let isSpeaking = false;
+        let autoSpeak = true;
+        let recognitionLang = 'hi-IN'; // Toggles between 'hi-IN' and 'en-IN'
+        let recognition = null;
+
+        // Voice Output State
+        let availableVoices = [];
+        let selectedVoiceURI = "";
+        let speechRate = 1.0;
+        let speechPitch = 1.0;
+        let currentAudioElement = null;
+
+        // DOM Elements
+        const chatContainer = document.getElementById('chatContainer');
+        const userInput = document.getElementById('userInput');
+        const micButton = document.getElementById('micButton');
+        const micIcon = document.getElementById('micIcon');
+        const statusText = document.getElementById('statusText');
+        const statusDot = document.getElementById('statusDot');
+        const interimTranscriptBox = document.getElementById('interimTranscriptBox');
+        const interimText = document.getElementById('interimText');
+        const liveStateBanner = document.getElementById('liveStateBanner');
+        const bannerStateTitle = document.getElementById('bannerStateTitle');
+        const avatarIcon = document.getElementById('avatarIcon');
+        const avatarVisualizer = document.getElementById('avatarVisualizer');
+        const voiceSelect = document.getElementById('voiceSelect');
+        const toastMessage = document.getElementById('toastMessage');
+
+        /**************************************************************
+         * 2. SPEECH-TO-TEXT (Web Speech API) INITIALIZATION
+         **************************************************************/
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                showToast("⚠️ आपके ब्राउज़र में वॉयस इनपुट समर्थित नहीं है। कृपया Chrome या Edge का उपयोग करें, या नीचे टाइप करें।");
+                return;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.lang = recognitionLang;
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = () => {
+                isListening = true;
+                stopSpeaking(); // Stop AI speaking if user starts talking
+                updateUIState('listening');
+                micButton.classList.add('mic-listening-ring', 'from-red-600', 'to-orange-500');
+                micIcon.className = 'ph-fill ph-Waveform text-2xl sm:text-3xl animate-pulse';
+                interimTranscriptBox.classList.remove('hidden');
+                interimText.textContent = recognitionLang === 'hi-IN' 
+                    ? "सुन रहा हूँ... कृपया बोलें..." 
+                    : "Listening (Hinglish/English)... Speak now...";
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                if (interimTranscript) {
+                    interimText.textContent = interimTranscript;
+                    userInput.value = interimTranscript;
+                }
+
+                if (finalTranscript) {
+                    const cleanedText = finalTranscript.trim();
+                    userInput.value = cleanedText;
+                    interimTranscriptBox.classList.add('hidden');
+                    stopListeningUI();
+                    if (cleanedText.length > 0) {
+                        processUserMessage(cleanedText);
+                        userInput.value = '';
+                    }
+                }
+            };
+
+            recognition.onerror = (event) => {
+                stopListeningUI();
+                if (event.error === 'no-speech') {
+                    showToast("कोई आवाज़ सुनाई नहीं दी। कृपया माइक के पास फिर से बोलें।");
+                } else if (event.error === 'not-allowed') {
+                    showToast("माइक्रोफ़ोन की अनुमति नहीं मिली। कृपया ब्राउज़र में माइक अनुमति दें।");
+                } else {
+                    showToast(`वॉयस पहचान में समस्या (${event.error})। आप टाइप करके भी पूछ सकते हैं।`);
+                }
+            };
+
+            recognition.onend = () => {
+                stopListeningUI();
+            };
+        }
+
+        function toggleListening() {
+            if (!recognition) {
+                initSpeechRecognition();
+                if (!recognition) return;
+            }
+
+            if (isListening) {
+                recognition.stop();
+                stopListeningUI();
+            } else {
+                try {
+                    recognition.lang = recognitionLang;
+                    recognition.start();
+                } catch (e) {
+                    recognition.stop();
+                }
+            }
+        }
+
+        function stopListeningUI() {
+            isListening = false;
+            micButton.classList.remove('mic-listening-ring', 'from-red-600', 'to-orange-500');
+            micIcon.className = 'ph-fill ph-microphone text-2xl sm:text-3xl';
+            interimTranscriptBox.classList.add('hidden');
+            if (!isSpeaking) {
+                updateUIState('ready');
+            }
+        }
+
+        function toggleRecognitionLang() {
+            recognitionLang = recognitionLang === 'hi-IN' ? 'en-IN' : 'hi-IN';
+            const label = document.getElementById('currentLangLabel');
+            if (recognitionLang === 'hi-IN') {
+                label.textContent = 'माइक: हिंदी (hi-IN)';
+                showToast("माइक भाषा: हिंदी (देवनागरी) चुनी गई");
+            } else {
+                label.textContent = 'माइक: Hinglish (en-IN)';
+                showToast("माइक भाषा: भारतीय अंग्रेजी / Hinglish चुनी गई");
+            }
+            if (isListening && recognition) {
+                recognition.stop();
+            }
+        }
+
+        /**************************************************************
+         * 3. TEXT-TO-SPEECH (Web Speech API + Gemini TTS Fallback)
+         **************************************************************/
+        function loadVoices() {
+            if (!('speechSynthesis' in window)) return;
+            const rawVoices = window.speechSynthesis.getVoices();
+            availableVoices = rawVoices;
+
+            // Keep the Gemini Neural Hindi option at the top, plus browser Hindi/Indian voices
+            const hindiVoices = rawVoices.filter(v => 
+                v.lang.toLowerCase().includes('hi') || 
+                v.lang.toLowerCase().includes('in') ||
+                v.name.toLowerCase().includes('hindi') ||
+                v.name.toLowerCase().includes('india')
+            );
+
+            voiceSelect.innerHTML = '';
+
+            // Add browser Hindi voices first if present
+            hindiVoices.forEach((voice, idx) => {
+                const option = document.createElement('option');
+                option.value = voice.voiceURI;
+                const isHindiNative = voice.lang.toLowerCase().includes('hi');
+                option.textContent = `${isHindiNative ? '🇮🇳' : '🌐'} ${voice.name} (${voice.lang})`;
+                voiceSelect.appendChild(option);
+                // Auto-select first genuine hi-IN voice
+                if (!selectedVoiceURI && isHindiNative) {
+                    selectedVoiceURI = voice.voiceURI;
+                    option.selected = true;
+                }
+            });
+
+            // Always add Gemini Neural Hindi TTS option so users without local Hindi packs get crystal-clear Hindi audio
+            const geminiOption = document.createElement('option');
+            geminiOption.value = 'gemini-neural';
+            geminiOption.textContent = '✨ Gemini Neural Hindi Voice (क्लाउड HD हिंदी आवाज़)';
+            voiceSelect.appendChild(geminiOption);
+
+            if (!selectedVoiceURI) {
+                // If browser has a Hindi voice, pick it; otherwise default to Gemini Neural
+                const bestHindi = hindiVoices.find(v => v.lang.toLowerCase().startsWith('hi'));
+                if (bestHindi) {
+                    selectedVoiceURI = bestHindi.voiceURI;
+                    voiceSelect.value = bestHindi.voiceURI;
+                } else {
+                    selectedVoiceURI = 'gemini-neural';
+                    voiceSelect.value = 'gemini-neural';
+                }
+            }
+        }
+
+        if ('speechSynthesis' in window) {
+            loadVoices();
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        function handleVoiceChange() {
+            selectedVoiceURI = voiceSelect.value;
+            const badge = document.getElementById('voiceEngineBadge');
+            badge.textContent = selectedVoiceURI === 'gemini-neural' ? 'Gemini HD' : 'Browser TTS';
+        }
+
+        function updateVoiceParams() {
+            speechRate = parseFloat(document.getElementById('rateSlider').value);
+            speechPitch = parseFloat(document.getElementById('pitchSlider').value);
+            document.getElementById('rateValueLabel').textContent = `${speechRate.toFixed(1)}x`;
+            document.getElementById('pitchValueLabel').textContent = speechPitch.toFixed(1);
+        }
+
+        function toggleAutoSpeak() {
+            autoSpeak = !autoSpeak;
+            const muteIcon = document.getElementById('muteIcon');
+            const muteBtn = document.getElementById('muteToggleBtn');
+            if (autoSpeak) {
+                muteIcon.className = 'ph-fill ph-speaker-high text-lg';
+                muteBtn.classList.replace('text-slate-500', 'text-teal-400');
+                showToast("🔊 ऑटो-वॉयस चालू है (Auto-Speak ON)");
+            } else {
+                muteIcon.className = 'ph-fill ph-speaker-slash text-lg';
+                muteBtn.classList.replace('text-teal-400', 'text-slate-500');
+                stopSpeaking();
+                showToast("🔇 ऑटो-वॉयस बंद है (Auto-Speak Muted)");
+            }
+        }
+
+        function stopSpeaking() {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+            if (currentAudioElement) {
+                currentAudioElement.pause();
+                currentAudioElement.currentTime = 0;
+                currentAudioElement = null;
+            }
+            isSpeaking = false;
+            updateUIState('ready');
+        }
+
+        async function speakText(text) {
+            if (!text) return;
+            stopSpeaking();
+
+            // Clean markdown symbols before speaking
+            const cleanSpeechText = text
+                .replace(/[*#_~`>]/g, '')
+                .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+                .trim();
+
+            // Check if user selected Gemini Neural TTS or if browser has no Hindi voice
+            const matchedVoice = availableVoices.find(v => v.voiceURI === selectedVoiceURI);
+
+            if (selectedVoiceURI === 'gemini-neural' || !matchedVoice) {
+                await speakWithGeminiTTS(cleanSpeechText);
+                return;
+            }
+
+            // Use Browser Web Speech API (window.speechSynthesis)
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(cleanSpeechText);
+                utterance.lang = 'hi-IN';
+                if (matchedVoice) {
+                    utterance.voice = matchedVoice;
+                    utterance.lang = matchedVoice.lang;
+                }
+                utterance.rate = speechRate;
+                utterance.pitch = speechPitch;
+
+                utterance.onstart = () => {
+                    isSpeaking = true;
+                    updateUIState('speaking');
+                };
+
+                utterance.onend = () => {
+                    isSpeaking = false;
+                    updateUIState('ready');
+                };
+
+                utterance.onerror = () => {
+                    isSpeaking = false;
+                    updateUIState('ready');
+                };
+
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // High-quality fallback using Gemini 2.5 Flash TTS for devices without local Hindi voices
+        async function speakWithGeminiTTS(text) {
+            try {
+                isSpeaking = true;
+                updateUIState('speaking');
+
+                const payload = {
+                    contents: [{
+                        parts: [{ text: `Say naturally and warmly in Hindi: ${text}` }]
+                    }],
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: {
+                            voiceConfig: {
+                                prebuiltVoiceConfig: { voiceName: "Kore" }
+                            }
+                        }
+                    }
+                };
+
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${apiKey}`;
+                const response = await fetchWithRetry(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType || "audio/L16;rate=24000";
+
+                if (audioData) {
+                    const rateMatch = mimeType.match(/rate=(\d+)/);
+                    const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+                    const pcmBuffer = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmBuffer);
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+
+                    currentAudioElement = new Audio(audioUrl);
+                    currentAudioElement.playbackRate = speechRate;
+                    currentAudioElement.onended = () => {
+                        isSpeaking = false;
+                        updateUIState('ready');
+                        URL.revokeObjectURL(audioUrl);
+                    };
+                    currentAudioElement.onerror = () => {
+                        isSpeaking = false;
+                        updateUIState('ready');
+                    };
+                    await currentAudioElement.play();
+                } else {
+                    isSpeaking = false;
+                    updateUIState('ready');
+                }
+            } catch (err) {
+                isSpeaking = false;
+                updateUIState('ready');
+            }
+        }
+
+        // Helper: Convert Base64 to ArrayBuffer
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        // Helper: Wrap signed 16-bit PCM into WAV container
+        function pcmToWav(pcm16, sampleRate) {
+            const buffer = new ArrayBuffer(44 + pcm16.length * 2);
+            const view = new DataView(buffer);
+
+            const writeString = (offset, str) => {
+                for (let i = 0; i < str.length; i++) {
+                    view.setUint8(offset + i, str.charCodeAt(i));
+                }
+            };
+
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + pcm16.length * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); // PCM format
+            view.setUint16(22, 1, true); // 1 channel (mono)
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, pcm16.length * 2, true);
+
+            let offset = 44;
+            for (let i = 0; i < pcm16.length; i++, offset += 2) {
+                view.setInt16(offset, pcm16[i], true);
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        /**************************************************************
+         * 4. GEMINI API INTEGRATION (Conversational Hindi AI)
+         **************************************************************/
+        async function fetchWithRetry(url, options, retries = 4) {
+            let delay = 1000;
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.ok) return response;
+                } catch (err) {
+                    // Retry silently on transient network issues
+                }
+                await new Promise(r => setTimeout(r, delay));
+                delay *= 2;
+            }
+            return fetch(url, options);
+        }
+
+        async function processUserMessage(userText) {
+            if (!userText.trim()) return;
+
+            // Stop any active speech
+            stopSpeaking();
+
+            // Add user bubble to UI
+            appendMessageBubble('user', userText);
+
+            // Add to conversation history
+            conversationHistory.push({
+                role: "user",
+                parts: [{ text: userText }]
+            });
+
+            // Show Thinking indicator
+            updateUIState('thinking');
+            const thinkingId = appendThinkingBubble();
+
+            try {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${apiKey}`;
+                const payload = {
+                    contents: conversationHistory,
+                    systemInstruction: {
+                        parts: [{ text: SYSTEM_INSTRUCTION }]
+                    }
+                };
+
+                const response = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                removeThinkingBubble(thinkingId);
+
+                const aiReply = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (aiReply) {
+                    conversationHistory.push({
+                        role: "model",
+                        parts: [{ text: aiReply }]
+                    });
+
+                    appendMessageBubble('ai', aiReply);
+
+                    if (autoSpeak) {
+                        speakText(aiReply);
+                    } else {
+                        updateUIState('ready');
+                    }
+                } else {
+                    const fallbackMsg = "क्षमा करें, मुझे अभी उत्तर प्राप्त करने में थोड़ी समस्या हो रही है। कृपया एक बार फिर से प्रयास करें।";
+                    appendMessageBubble('ai', fallbackMsg);
+                    updateUIState('ready');
+                }
+            } catch (error) {
+                removeThinkingBubble(thinkingId);
+                const errMsg = "क्षमा करें, नेटवर्क कनेक्शन में त्रुटि हुई। कृपया पुनः प्रयास करें।";
+                appendMessageBubble('ai', errMsg);
+                updateUIState('ready');
+            }
+        }
+
+        /**************************************************************
+         * 5. UI RENDERING & INTERACTION HELPERS
+         **************************************************************/
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            const text = userInput.value.trim();
+            if (!text) return;
+            userInput.value = '';
+            processUserMessage(text);
+        }
+
+        function sendQuickPrompt(promptText) {
+            processUserMessage(promptText);
+        }
+
+        function appendMessageBubble(sender, text) {
+            const wrapper = document.createElement('div');
+            const timestamp = new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' });
+
+            if (sender === 'user') {
+                wrapper.className = 'flex items-start justify-end gap-3 animate-fadeIn';
+                wrapper.innerHTML = `
+                    <div class="bg-gradient-to-br from-orange-600 to-amber-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[85%] sm:max-w-[75%] shadow-lg shadow-orange-950/40">
+                        <p class="text-sm sm:text-base leading-relaxed font-hindi break-words">${escapeHTML(text)}</p>
+                        <div class="flex items-center justify-end gap-2 mt-1.5 text-[10px] text-orange-100/80">
+                            <span>आप • ${timestamp}</span>
+                        </div>
+                    </div>
+                    <div class="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 mt-1">
+                        <i class="ph-fill ph-user text-orange-300 text-sm"></i>
+                    </div>
+                `;
+            } else {
+                const safeForAttr = encodeURIComponent(text);
+                wrapper.className = 'flex items-start gap-3 animate-fadeIn';
+                wrapper.innerHTML = `
+                    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center shrink-0 mt-1 shadow-md">
+                        <i class="ph-fill ph-sparkle text-white text-sm"></i>
+                    </div>
+                    <div class="bg-slate-900/95 border border-slate-800 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%] sm:max-w-[75%] shadow-md">
+                        <p class="text-sm sm:text-base text-slate-100 leading-relaxed font-hindi whitespace-pre-line break-words">${escapeHTML(text)}</p>
+                        <div class="flex items-center justify-between gap-4 mt-2.5 pt-2 border-t border-slate-800/80 text-[11px] text-slate-400">
+                            <span>वाणी AI • ${timestamp}</span>
+                            <div class="flex items-center gap-3">
+                                <button onclick="speakDecodedText('${safeForAttr}')" class="flex items-center gap-1 text-teal-400 hover:text-teal-300 font-medium transition">
+                                    <i class="ph-fill ph-speaker-high text-sm"></i> फिर से सुनें (Replay)
+                                </button>
+                                <button onclick="copyMessageText('${safeForAttr}')" class="text-slate-400 hover:text-slate-200 transition" title="Copy">
+                                    <i class="ph ph-copy text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            chatContainer.appendChild(wrapper);
+            scrollToBottom();
+        }
+
+        function speakDecodedText(encoded) {
+            const decoded = decodeURIComponent(encoded);
+            speakText(decoded);
+        }
+
+        function copyMessageText(encoded) {
+            const decoded = decodeURIComponent(encoded);
+            const tempInput = document.createElement('textarea');
+            tempInput.value = decoded;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast("✅ संदेश कॉपी कर लिया गया (Copied to clipboard)");
+        }
+
+        function appendThinkingBubble() {
+            const id = 'thinking-' + Date.now();
+            const wrapper = document.createElement('div');
+            wrapper.id = id;
+            wrapper.className = 'flex items-start gap-3';
+            wrapper.innerHTML = `
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center shrink-0 mt-1 animate-spin">
+                    <i class="ph-fill ph-circle-notch text-white text-sm"></i>
+                </div>
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl rounded-tl-sm px-4 py-3 shadow-md flex items-center gap-2.5">
+                    <div class="flex space-x-1">
+                        <span class="w-2 h-2 bg-orange-400 rounded-full animate-bounce"></span>
+                        <span class="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style="animation-delay: 0.15s"></span>
+                        <span class="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style="animation-delay: 0.3s"></span>
+                    </div>
+                    <span class="text-xs sm:text-sm text-amber-300 font-medium">सोच रहा हूँ... (Thinking...)</span>
+                </div>
+            `;
+            chatContainer.appendChild(wrapper);
+            scrollToBottom();
+            return id;
+        }
+
+        function removeThinkingBubble(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        function updateUIState(state) {
+            // States: 'ready', 'listening', 'thinking', 'speaking'
+            if (state === 'listening') {
+                statusDot.className = 'w-2 h-2 rounded-full bg-orange-500 animate-ping';
+                statusText.textContent = 'सुन रहा हूँ... बोलिए (Listening...)';
+                statusText.className = 'text-xs text-orange-400 font-semibold';
+                liveStateBanner.classList.remove('hidden');
+                bannerStateTitle.textContent = '🎙️ सुन रहा हूँ... (Listening to your voice...)';
+                avatarIcon.classList.remove('hidden');
+                avatarVisualizer.classList.add('hidden');
+            } else if (state === 'thinking') {
+                statusDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+                statusText.textContent = 'सोच रहा हूँ... (Thinking...)';
+                statusText.className = 'text-xs text-amber-300 font-semibold';
+                liveStateBanner.classList.add('hidden');
+                avatarIcon.classList.remove('hidden');
+                avatarVisualizer.classList.add('hidden');
+            } else if (state === 'speaking') {
+                statusDot.className = 'w-2 h-2 rounded-full bg-teal-400 animate-ping';
+                statusText.textContent = 'बोल रहा हूँ... (Speaking...)';
+                statusText.className = 'text-xs text-teal-300 font-semibold';
+                liveStateBanner.classList.remove('hidden');
+                bannerStateTitle.textContent = '🔊 वाणी AI बोल रही है... (Speaking in Hindi...)';
+                avatarIcon.classList.add('hidden');
+                avatarVisualizer.classList.remove('hidden');
+                avatarVisualizer.classList.add('flex', 'speaking-active');
+            } else {
+                statusDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+                statusText.textContent = 'तैयार है • बोलने के लिए माइक दबाएं (Ready)';
+                statusText.className = 'text-xs text-slate-300 font-medium';
+                liveStateBanner.classList.add('hidden');
+                avatarIcon.classList.remove('hidden');
+                avatarVisualizer.classList.add('hidden');
+                avatarVisualizer.classList.remove('flex', 'speaking-active');
+            }
+        }
+
+        function toggleSettingsModal() {
+            const panel = document.getElementById('settingsPanel');
+            panel.classList.toggle('hidden');
+        }
+
+        function clearConversation() {
+            stopSpeaking();
+            if (isListening && recognition) recognition.stop();
+            conversationHistory = [];
+            // Keep only the welcome card inside chatContainer
+            const welcomeCard = document.getElementById('welcomeCard');
+            chatContainer.innerHTML = '';
+            if (welcomeCard) {
+                chatContainer.appendChild(welcomeCard);
+            }
+            appendMessageBubble('ai', 'चैट इतिहास साफ़ कर दिया गया है। नमस्ते! हम फिर से नई बातचीत शुरू कर सकते हैं।');
+            showToast("🧹 बातचीत साफ़ कर दी गई (Conversation Cleared)");
+        }
+
+        function scrollToBottom() {
+            chatContainer.scrollTo({
+                top: chatContainer.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+
+        function showToast(msg) {
+            toastMessage.textContent = msg;
+            toastMessage.classList.remove('hidden');
+            clearTimeout(window.toastTimer);
+            window.toastTimer = setTimeout(() => {
+                toastMessage.classList.add('hidden');
+            }, 3500);
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, tag => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[tag]));
+        }
+
+        // Initialize speech recognition on window load
+        window.onload = () => {
+            initSpeechRecognition();
+            loadVoices();
+        };
+    </script>
+</body>
+</html>
